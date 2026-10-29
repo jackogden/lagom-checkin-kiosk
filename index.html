@@ -15,12 +15,13 @@
           --green:#2E7D4F; --greenbg:#E4F3EA; --amber:#B4790C; --amberbg:#FBEEDA; --red:#B23A3A; --redbg:#FAE6E6; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { min-height:100%; margin:0; }
-  body { padding:2.5vh 0 40vh; }
+  body { padding:0 0 40vh; }
+  #app { margin-top:2.5vh; }
   body { background:#363658; color:var(--lav); font-family:'Raleway',-apple-system,system-ui,sans-serif;
          display:flex; align-items:flex-start; justify-content:center; user-select:none; -webkit-user-select:none;
          overscroll-behavior:none; }
   .card { position:relative; z-index:2; background:#fff; width:min(760px,92vw); border-radius:10px 10px 10px 10px; border-top:6px solid var(--ocre);
-          box-shadow:0 6px 28px rgba(54,54,98,.14); padding:26px 52px 30px; text-align:center; transition:padding .15s; }
+          box-shadow:0 6px 28px rgba(54,54,98,.14); padding:26px 52px 30px; text-align:center; transition:padding .15s, margin-top .25s ease; }
   img.logo { height:72px; margin-bottom:0; }
   h1 { font-family:'Nanum Myeongjo',Georgia,serif; font-weight:400; font-size:36px; margin:6px 0 4px; }
   p.sub { color:var(--muted); font-weight:300; font-size:20px; margin:0 0 20px; line-height:1.4; }
@@ -56,8 +57,7 @@
   input { caret-color:transparent; }
   input.active { border-color:var(--ocre); background:#fff; box-shadow:0 0 0 4px rgba(201,118,42,.28); }
   #kb { position:fixed; left:50%; bottom:max(14px, env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(1060px,96vw); z-index:40;
-        display:none; padding:12px; border-radius:26px; background:rgba(18,18,44,.72); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
-        box-shadow:0 10px 40px rgba(0,0,0,.38); touch-action:manipulation; -webkit-user-select:none; user-select:none; }
+        display:none; padding:12px; background:transparent; touch-action:manipulation; -webkit-user-select:none; user-select:none; }
   #kb.on { display:block; }
   #kb.num { width:min(540px,94vw); }
   #kb .kr { display:flex; gap:8px; margin-bottom:8px; }
@@ -65,12 +65,12 @@
   #kb .gap { flex:.5 1 0; }
   #kb button { flex:1 1 0; min-width:0; width:auto; margin:0; padding:0; height:clamp(54px,8.6vh,78px); border:0; border-radius:14px;
                background:#F4F3F1; color:var(--lav); font:300 clamp(24px,3.3vh,32px) 'Raleway',-apple-system,system-ui,sans-serif; font-variant-numeric:lining-nums; letter-spacing:.02em;
-               box-shadow:0 3px 0 rgba(0,0,0,.30); touch-action:manipulation; }
+               box-shadow:0 6px 18px rgba(8,8,30,.38), 0 1px 0 rgba(255,255,255,.5) inset; touch-action:manipulation; }
   #kb.num button { height:clamp(54px,8.4vh,84px); font-size:clamp(26px,3.6vh,36px); }
   #kb button.down, #kb button:active { background:#D6D3EE; transform:translateY(2px); box-shadow:none; }
   #kb button.fn { background:rgba(255,255,255,.16); color:#fff; flex:1.6 1 0; font-weight:300; font-size:clamp(22px,3vh,30px); }
   #kb button.fn.down, #kb button.fn:active { background:rgba(255,255,255,.35); }
-  #kb button.act { background:var(--ocre); color:#fff; flex:2.4 1 0; font-weight:500; text-transform:uppercase; letter-spacing:.14em; font-size:clamp(15px,2.1vh,20px); box-shadow:0 3px 0 rgba(0,0,0,.30); }
+  #kb button.act { background:var(--ocre); color:#fff; flex:2.4 1 0; font-weight:500; text-transform:uppercase; letter-spacing:.14em; font-size:clamp(15px,2.1vh,20px); }
   #kb button.act.down, #kb button.act:active { background:#E0903F; }
   #kb button.sp { flex:6 1 0; font-size:clamp(15px,2.1vh,20px); text-transform:uppercase; letter-spacing:.2em; color:#8d8ba6; }
 
@@ -199,7 +199,7 @@
     home.classList.add('on'); document.body.classList.add('at-home');
     playIntro();
   }
-  home.addEventListener('click', function () { clearTimeout(loopT); home.classList.remove('on'); document.body.classList.remove('at-home'); showForm(); });
+  home.addEventListener('click', function () { clearTimeout(loopT); home.classList.remove('on'); document.body.classList.remove('at-home'); showForm(); layout(); });
 
   function showForm() {
     clearTimeout(resetTimer);
@@ -222,8 +222,9 @@
     if (test) { var sp = document.createElement('span'); sp.className = 'test'; sp.textContent = 'TEST MODE \u2014 nothing was recorded'; tf.appendChild(sp); }
     $('rtitle').textContent = title; $('rtext').textContent = text; $('rsmall').textContent = small || '';
     clearTimeout(resetTimer); resetTimer = setTimeout(showHome, secs * 1000);
+    layout();
   }
-  function fail(msg) { err.textContent = msg; err.style.display = 'block'; form.classList.remove('busy'); go.disabled = false; go.textContent = 'Check in'; setActive('surname'); }
+  function fail(msg) { err.textContent = msg; err.style.display = 'block'; form.classList.remove('busy'); go.disabled = false; go.textContent = 'Check in'; setActive('surname'); layout(); }
 
   var NEEDHELP = 'Please call the clinic on the number in your appointment confirmation.';
 
@@ -282,12 +283,32 @@
     kb.className = 'on' + (MAXNUM(id) ? ' num' : '');
     kb.innerHTML = build(id);
     document.body.classList.add('typing');
+    layout();
   }
+
+  // Centre the card between the top of the screen and the keyboard (or the whole screen when no keyboard).
+  function kbMaxHeight() {
+    var cls = kb.className, html = kb.innerHTML, m = 0;
+    var ids = active === 'setupcode' ? ['setupcode'] : ['surname', 'dd'];
+    kb.style.visibility = 'hidden';
+    ids.forEach(function (id) { kb.className = 'on' + (MAXNUM(id) ? ' num' : ''); kb.innerHTML = build(id); m = Math.max(m, kb.offsetHeight); });
+    kb.className = cls; kb.innerHTML = html; kb.style.visibility = '';
+    return m + 2;   // keys start 12px inside the keyboard box, which sits 14px above the screen edge
+  }
+  function layout() {
+    var app = $('app');
+    if (document.body.classList.contains('at-home')) return;
+    var avail = window.innerHeight - (kb.classList.contains('on') ? kbMaxHeight() : 0);
+    var top = Math.max(10, Math.round((avail - app.offsetHeight) / 2));
+    app.style.marginTop = top + 'px';
+  }
+  window.addEventListener('resize', layout); window.addEventListener('orientationchange', layout);
   function MAXNUM(id) { return id === 'dd' || id === 'mm' || id === 'yyyy'; }
   function hideKb() {
     active = null; kb.className = ''; kb.innerHTML = '';
     IDS.forEach(function (x) { $(x).classList.remove('active'); });
     document.body.classList.remove('typing');
+    layout();
   }
   function press(k) {
     touch();
