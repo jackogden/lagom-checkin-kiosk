@@ -52,6 +52,29 @@
   .test { background:var(--amberbg); color:var(--amber); font-weight:700; padding:8px 14px; border-radius:6px; display:inline-block; margin-bottom:14px; }
   .busy { opacity:.6; pointer-events:none; }
 
+  /* ---- built-in on-screen keyboard (replaces the iPad keyboard) ---- */
+  input { caret-color:transparent; }
+  input.active { border-color:var(--ocre); background:#fff; box-shadow:0 0 0 4px rgba(201,118,42,.28); }
+  #kb { position:fixed; left:50%; bottom:max(14px, env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(1060px,96vw); z-index:40;
+        display:none; padding:12px; border-radius:26px; background:rgba(18,18,44,.72); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+        box-shadow:0 10px 40px rgba(0,0,0,.38); touch-action:manipulation; -webkit-user-select:none; user-select:none; }
+  #kb.on { display:block; }
+  #kb.num { width:min(540px,94vw); }
+  #kb .kr { display:flex; gap:8px; margin-bottom:8px; }
+  #kb .kr:last-child { margin-bottom:0; }
+  #kb .gap { flex:.5 1 0; }
+  #kb button { flex:1 1 0; min-width:0; width:auto; margin:0; padding:0; height:clamp(54px,8.6vh,78px); border:0; border-radius:14px;
+               background:#F4F3F1; color:var(--lav); font:600 clamp(23px,3.2vh,31px) 'Open Sans',-apple-system,system-ui,sans-serif; letter-spacing:0;
+               box-shadow:0 3px 0 rgba(0,0,0,.30); touch-action:manipulation; }
+  #kb.num button { height:clamp(54px,8.4vh,84px); font-size:clamp(26px,3.6vh,36px); }
+  #kb button.down, #kb button:active { background:#D6D3EE; transform:translateY(2px); box-shadow:none; }
+  #kb button.fn { background:rgba(255,255,255,.2); color:#fff; flex:1.6 1 0; font-size:clamp(20px,2.8vh,27px); }
+  #kb button.fn.down, #kb button.fn:active { background:rgba(255,255,255,.35); }
+  #kb button.act { background:var(--ocre); color:#fff; flex:2.4 1 0; font-size:clamp(20px,2.8vh,27px); box-shadow:0 3px 0 rgba(0,0,0,.30); }
+  #kb button.act.down, #kb button.act:active { background:#E0903F; }
+  #kb button.sp { flex:6 1 0; }
+
+
   /* ---- animated backdrop shared by every screen ---- */
   #backdrop { position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; background:#363658; }
   body.at-home #app { visibility:hidden; }
@@ -113,14 +136,14 @@
     <div class="err" id="err" role="alert"></div>
     <div class="row">
       <label for="surname">Surname</label>
-      <input id="surname" type="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="next">
+      <input id="surname" type="text" readonly inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
     </div>
     <div class="row">
       <label>Date of birth</label>
       <div class="dob">
-        <input id="dd" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="DD" autocomplete="off">
-        <input id="mm" inputmode="numeric" pattern="[0-9]*" maxlength="2" placeholder="MM" autocomplete="off">
-        <input id="yyyy" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="YYYY" autocomplete="off">
+        <input id="dd" readonly inputmode="none" maxlength="2" placeholder="DD" autocomplete="off">
+        <input id="mm" readonly inputmode="none" maxlength="2" placeholder="MM" autocomplete="off">
+        <input id="yyyy" readonly inputmode="none" maxlength="4" placeholder="YYYY" autocomplete="off">
       </div>
     </div>
     <button id="go" type="button">Check in</button>
@@ -129,7 +152,7 @@
   <section class="result" id="setup">
     <h1>Set up this device</h1>
     <p class="sub">Enter the setup code (clinic staff only).</p>
-    <div class="row"><input id="setupcode" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="Setup code"></div>
+    <div class="row"><input id="setupcode" type="text" readonly inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Setup code"></div>
     <button id="setupgo" type="button">Save</button>
   </section>
 
@@ -141,6 +164,8 @@
     <p class="small" id="rsmall"></p>
   </section>
 </main>
+
+<div id="kb" aria-hidden="true"></div>
 
 <script>
 (function () {
@@ -168,7 +193,7 @@
     clearTimeout(resetTimer); clearTimeout(idle);
     $('surname').value = ''; $('dd').value = ''; $('mm').value = ''; $('yyyy').value = '';
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    document.body.classList.remove('typing');
+    hideKb();
     err.style.display = 'none'; result.style.display = 'none'; $('setup').style.display = 'none'; form.style.display = 'block';
     form.classList.remove('busy'); go.disabled = false; go.textContent = 'Check in';
     home.classList.add('on'); document.body.classList.add('at-home');
@@ -181,14 +206,14 @@
     $('surname').value = ''; $('dd').value = ''; $('mm').value = ''; $('yyyy').value = '';
     err.style.display = 'none'; result.style.display = 'none'; $('setup').style.display = 'none'; form.style.display = 'block';
     form.classList.remove('busy'); go.disabled = false; go.textContent = 'Check in';
+    setActive('surname');
     touch();
   }
   function touch() { clearTimeout(idle); idle = setTimeout(function () { if (form.style.display !== 'none' && !home.classList.contains('on') && !go.disabled) showHome(); }, 10000); }
   ['touchstart', 'keydown', 'mousedown'].forEach(function (ev) { document.addEventListener(ev, touch, { passive: true }); });
 
   function show(kind, title, text, small, secs, test) {
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    document.body.classList.remove('typing');
+    hideKb();
     form.style.display = 'none'; result.style.display = 'block';
     var b = $('badge');
     b.className = 'badge ' + (kind === 'ok' ? 'b-ok' : kind === 'warn' ? 'b-warn' : 'b-bad');
@@ -198,17 +223,7 @@
     $('rtitle').textContent = title; $('rtext').textContent = text; $('rsmall').textContent = small || '';
     clearTimeout(resetTimer); resetTimer = setTimeout(showHome, secs * 1000);
   }
-  function fail(msg) { err.textContent = msg; err.style.display = 'block'; form.classList.remove('busy'); go.disabled = false; go.textContent = 'Check in'; }
-
-  ['dd', 'mm'].forEach(function (id) {
-    $(id).addEventListener('input', function (e) {
-      e.target.value = e.target.value.replace(/\D/g, '');
-      if (e.target.value.length === 2) $(id === 'dd' ? 'mm' : 'yyyy').focus();
-    });
-  });
-  $('yyyy').addEventListener('input', function (e) { e.target.value = e.target.value.replace(/\D/g, ''); });
-  $('surname').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('dd').focus(); });
-  $('yyyy').addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+  function fail(msg) { err.textContent = msg; err.style.display = 'block'; form.classList.remove('busy'); go.disabled = false; go.textContent = 'Check in'; setActive('surname'); }
 
   var NEEDHELP = 'Please call the clinic on the number in your appointment confirmation.';
 
@@ -217,7 +232,7 @@
     if (s.length < 2) return fail('Please enter your surname.');
     if (!d || !m || y.length !== 4) return fail('Please enter your full date of birth.');
     var dob = y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2);
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    hideKb();
     err.style.display = 'none'; form.classList.add('busy'); go.disabled = true; go.textContent = 'Checking\u2026';
     var key = ''; try { key = localStorage.getItem(KEY_STORE) || ''; } catch (e) {}
     fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-kiosk-key': key },
@@ -232,23 +247,106 @@
         else if (j.status === 'not_found') fail("We couldn't find an appointment today with those details. Please check the spelling and date of birth, and try again.");
         else if (j.status === 'bad_request') fail('Please check your surname and date of birth.');
         else if (j.status === 'locked') show('bad', 'Check-in unavailable', NEEDHELP, '', 20);
-        else if (j.status === 'unauthorised') { try { localStorage.removeItem(KEY_STORE); } catch (e) {} form.style.display = 'none'; result.style.display = 'none'; $('setup').style.display = 'block'; home.classList.remove('on'); document.body.classList.remove('at-home'); }
+        else if (j.status === 'unauthorised') { try { localStorage.removeItem(KEY_STORE); } catch (e) {} form.style.display = 'none'; result.style.display = 'none'; $('setup').style.display = 'block'; home.classList.remove('on'); document.body.classList.remove('at-home'); setActive('setupcode'); }
         else show('warn', "We couldn't check you in automatically", NEEDHELP, '', 20);
       })
       .catch(function () { show('warn', "We couldn't check you in automatically", NEEDHELP, '', 20); });
   }
-  document.addEventListener('focusin', function (e) { if (e.target.tagName === 'INPUT') document.body.classList.add('typing'); });
-  document.addEventListener('focusout', function () { setTimeout(function () { if (!document.activeElement || document.activeElement.tagName !== 'INPUT') document.body.classList.remove('typing'); }, 150); });
   go.addEventListener('click', submit);
-  $('setupgo').addEventListener('click', function () {
+
+  // ---------------- on-screen keyboard ----------------
+  var kb = $('kb'), active = null;
+  var IDS = ['surname', 'dd', 'mm', 'yyyy', 'setupcode'];
+  var MAX = { surname: 40, dd: 2, mm: 2, yyyy: 4, setupcode: 40 };
+  var NEXT = { surname: 'dd', dd: 'mm', mm: 'yyyy' };
+  function keyBtn(k, label, cls) { return '<button type="button" data-k="' + k + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + label + '</button>'; }
+  function build(id) {
+    var mode = id === 'surname' ? 'alpha' : id === 'setupcode' ? 'setup' : 'num', h = '', lower = mode === 'setup';
+    var act = id === 'yyyy' ? 'Check in' : id === 'setupcode' ? 'Save' : 'Next';
+    function row(keys) { return '<div class="kr">' + keys + '</div>'; }
+    function letters(str) { return str.split('').map(function (c) { return keyBtn(c.toLowerCase(), lower ? c.toLowerCase() : c); }).join(''); }
+    if (mode === 'num') {
+      var row123 = ['123', '456', '789'].map(function (r) { return row(letters(r)); }).join('');
+      return row123 + row(keyBtn('<', '\u232B', 'fn') + keyBtn('0', '0') + keyBtn('>', act, 'act'));
+    }
+    if (mode === 'setup') h += row(letters('1234567890'));
+    h += row(letters('QWERTYUIOP'));
+    h += row('<span class="gap"></span>' + letters('ASDFGHJKL') + '<span class="gap"></span>');
+    h += row('<span class="gap"></span>' + letters('ZXCVBNM') + keyBtn('<', '\u232B', 'fn') + '<span class="gap"></span>');
+    h += row(mode === 'alpha' ? keyBtn('-', '-') + keyBtn("'", "'") + keyBtn(' ', 'space', 'sp') + keyBtn('>', act, 'act') : keyBtn('>', act, 'act'));
+    return h;
+  }
+  function setActive(id) {
+    active = id;
+    IDS.forEach(function (x) { $(x).classList.toggle('active', x === id); });
+    kb.className = 'on' + (MAXNUM(id) ? ' num' : '');
+    kb.innerHTML = build(id);
+    document.body.classList.add('typing');
+  }
+  function MAXNUM(id) { return id === 'dd' || id === 'mm' || id === 'yyyy'; }
+  function hideKb() {
+    active = null; kb.className = ''; kb.innerHTML = '';
+    IDS.forEach(function (x) { $(x).classList.remove('active'); });
+    document.body.classList.remove('typing');
+  }
+  function press(k) {
+    touch();
+    if (!active) return;
+    var el = $(active), v = el.value;
+    if (k === '>') {
+      if (NEXT[active]) return setActive(NEXT[active]);
+      if (active === 'yyyy') return submit();
+      if (active === 'setupcode') return saveSetup();
+      return;
+    }
+    if (k === '<') {
+      if (!v) { var prev = active === 'yyyy' ? 'mm' : active === 'mm' ? 'dd' : active === 'dd' ? 'surname' : null; if (prev) setActive(prev); return; }
+      el.value = v.slice(0, -1); return;
+    }
+    if (v.length >= MAX[active]) { if (NEXT[active] && MAXNUM(active)) setActive(NEXT[active]); return; }
+    if (active === 'surname') {
+      var prevc = v.slice(-1), up = !v || prevc === ' ' || prevc === '-' || prevc === "'";
+      if (k === ' ' && (!v || prevc === ' ')) return;
+      el.value = v + (up ? k.toUpperCase() : k.toLowerCase());
+      return;
+    }
+    if (active === 'setupcode') { el.value = v + k; return; }
+    // digits
+    if (!/^\d$/.test(k)) return;
+    // block impossible dates as they are typed
+    if (active === 'dd') { if (v === '3' && +k > 1) return; if (v === '0' && k === '0') return; }
+    if (active === 'mm') { if (v === '1' && +k > 2) return; if (v === '0' && k === '0') return; }
+    if (active === 'yyyy' && !v && k !== '1' && k !== '2') return;
+    if (active === 'dd' && !v && +k > 3) { el.value = '0' + k; return setActive('mm'); }
+    if (active === 'mm' && !v && +k > 1) { el.value = '0' + k; return setActive('yyyy'); }
+    el.value = v + k;
+    if (el.value.length === MAX[active] && NEXT[active]) setActive(NEXT[active]);
+  }
+  kb.addEventListener('pointerdown', function (e) {
+    var b = e.target.closest && e.target.closest('button[data-k]');
+    if (!b) return;
+    e.preventDefault();
+    b.classList.add('down');
+    var off = function () { b.classList.remove('down'); };
+    b.addEventListener('pointerup', off, { once: true }); b.addEventListener('pointerleave', off, { once: true }); b.addEventListener('pointercancel', off, { once: true });
+    press(b.getAttribute('data-k'));
+  });
+  kb.addEventListener('click', function (e) { e.preventDefault(); });
+  IDS.forEach(function (id) {
+    var el = $(id);
+    el.addEventListener('pointerdown', function (e) { e.preventDefault(); touch(); setActive(id); });
+    el.addEventListener('focus', function () { el.blur(); });
+  });
+  function saveSetup() {
     var c = $('setupcode').value.trim();
     if (c.length < 8) return;
     try { localStorage.setItem(KEY_STORE, c); } catch (e) {}
-    $('setupcode').value = ''; showHome();
-  });
+    $('setupcode').value = ''; hideKb(); showHome();
+  }
+  $('setupgo').addEventListener('click', saveSetup);
   var have = ''; try { have = localStorage.getItem(KEY_STORE) || ''; } catch (e) {}
   showHome();
-  if (!have) { home.classList.remove('on'); form.style.display = 'none'; $('setup').style.display = 'block'; home.classList.remove('on'); document.body.classList.remove('at-home'); }
+  if (!have) { home.classList.remove('on'); form.style.display = 'none'; $('setup').style.display = 'block'; document.body.classList.remove('at-home'); setActive('setupcode'); }
 })();
 </script>
 </body>
