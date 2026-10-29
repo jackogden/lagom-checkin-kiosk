@@ -70,6 +70,13 @@
     <button id="go" type="button">Check in</button>
   </section>
 
+  <section class="result" id="setup">
+    <h1>Set up this device</h1>
+    <p class="sub">Enter the setup code (clinic staff only).</p>
+    <div class="row"><input id="setupcode" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="Setup code"></div>
+    <button id="setupgo" type="button">Save</button>
+  </section>
+
   <section class="result" id="result">
     <div class="badge" id="badge"></div>
     <div id="testflag"></div>
@@ -83,8 +90,8 @@
 (function () {
   var API = 'https://euguiuqdjtpwdztifrlc.supabase.co/functions/v1/checkin';
   var KEY_STORE = 'lagom_checkin_key';
-  var h = location.hash.match(/k=([^&]+)/);
-  if (h) { try { localStorage.setItem(KEY_STORE, decodeURIComponent(h[1])); } catch (e) {} history.replaceState(null, '', location.pathname + location.search); }
+  var h = (location.hash + '&' + location.search).match(/[#?&]k=([^&]+)/);
+  if (h) { try { localStorage.setItem(KEY_STORE, decodeURIComponent(h[1])); } catch (e) {} }
 
   var $ = function (id) { return document.getElementById(id); };
   var form = $('form'), result = $('result'), err = $('err'), go = $('go');
@@ -93,7 +100,7 @@
   function showForm() {
     clearTimeout(resetTimer);
     $('surname').value = ''; $('dd').value = ''; $('mm').value = ''; $('yyyy').value = '';
-    err.style.display = 'none'; result.style.display = 'none'; form.style.display = 'block';
+    err.style.display = 'none'; result.style.display = 'none'; $('setup').style.display = 'none'; form.style.display = 'block';
     form.classList.remove('busy'); go.disabled = false; go.textContent = 'Check in';
     touch();
   }
@@ -143,13 +150,21 @@
         else if (j.status === 'not_found') fail("We couldn't find an appointment today with those details. Please check the spelling and date of birth, and try again.");
         else if (j.status === 'bad_request') fail('Please check your surname and date of birth.');
         else if (j.status === 'locked') show('bad', 'Check-in unavailable', NEEDHELP, '', 20);
-        else if (j.status === 'unauthorised') show('bad', 'Not set up', 'This device has not been set up for check-in.', '', 20);
+        else if (j.status === 'unauthorised') { try { localStorage.removeItem(KEY_STORE); } catch (e) {} form.style.display = 'none'; result.style.display = 'none'; $('setup').style.display = 'block'; }
         else show('warn', "We couldn't check you in automatically", NEEDHELP, '', 20);
       })
       .catch(function () { show('warn', "We couldn't check you in automatically", NEEDHELP, '', 20); });
   }
   go.addEventListener('click', submit);
+  $('setupgo').addEventListener('click', function () {
+    var c = $('setupcode').value.trim();
+    if (c.length < 8) return;
+    try { localStorage.setItem(KEY_STORE, c); } catch (e) {}
+    $('setupcode').value = ''; showForm();
+  });
+  var have = ''; try { have = localStorage.getItem(KEY_STORE) || ''; } catch (e) {}
   showForm();
+  if (!have) { form.style.display = 'none'; $('setup').style.display = 'block'; }
 })();
 </script>
 </body>
