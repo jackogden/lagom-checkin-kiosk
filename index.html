@@ -74,9 +74,9 @@
   #home .content { position:relative; z-index:2; animation:rise 1.4s ease-out both; }
   @keyframes rise { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:none; } }
   #home .mark { width:min(380px,44vmin); aspect-ratio:1; margin:0 auto; position:relative; }
-  #home .mark video { width:100%; height:100%; display:block; background:#363658;
+  #home .mark video { width:100%; height:100%; display:block; background:#363658; transition:opacity .9s ease;
       -webkit-mask-image:radial-gradient(circle, #000 58%, transparent 71%); mask-image:radial-gradient(circle, #000 58%, transparent 71%); }
-  #home .mark::after { content:''; position:absolute; inset:14%; border-radius:50%; box-shadow:0 0 90px 10px rgba(201,118,42,.20); animation:glow 6s ease-in-out infinite; pointer-events:none; }
+  #home .mark::after { content:''; position:absolute; inset:-10%; border-radius:50%; background:radial-gradient(circle, rgba(201,118,42,.13) 0, rgba(201,118,42,.13) 38%, rgba(201,118,42,0) 68%); animation:glow 6s ease-in-out infinite; pointer-events:none; }
   @keyframes glow { 0%,100% { opacity:.35; } 50% { opacity:1; } }
   #home .name { font-family:'Nanum Myeongjo',Georgia,serif; font-weight:700; color:var(--ocre); letter-spacing:.32em; text-transform:uppercase; font-size:clamp(15px,1.9vw,21px); margin:6px 0 0 .32em; }
   #home h2 { font-family:'Nanum Myeongjo',Georgia,serif; font-weight:400; font-size:clamp(28px,4.4vw,46px); margin:22px 0 8px; letter-spacing:.01em; }
@@ -149,7 +149,18 @@
   var $ = function (id) { return document.getElementById(id); };
   var form = $('form'), result = $('result'), err = $('err'), go = $('go');
   var idle, resetTimer;
-  var home = $('home');
+  var home = $('home'), hv = $('hv'), loopT;
+  function playIntro() {
+    clearTimeout(loopT);
+    if (!hv) return;
+    hv.style.opacity = 1;
+    try { hv.currentTime = 0; var pr = hv.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
+  }
+  // Loop: hold the finished mark for a few seconds, fade out, replay from the start.
+  if (hv) hv.addEventListener('ended', function () {
+    if (!home.classList.contains('on')) return;
+    loopT = setTimeout(function () { hv.style.opacity = 0; loopT = setTimeout(playIntro, 950); }, 3500);
+  });
   function showHome() {
     clearTimeout(resetTimer); clearTimeout(idle);
     $('surname').value = ''; $('dd').value = ''; $('mm').value = ''; $('yyyy').value = '';
@@ -158,9 +169,9 @@
     err.style.display = 'none'; result.style.display = 'none'; $('setup').style.display = 'none'; form.style.display = 'block';
     form.classList.remove('busy'); go.disabled = false; go.textContent = 'Check in';
     home.classList.add('on');
-    var hv = $('hv'); if (hv) { try { hv.currentTime = 0; var pr = hv.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {} }
+    playIntro();
   }
-  home.addEventListener('click', function () { home.classList.remove('on'); showForm(); });
+  home.addEventListener('click', function () { clearTimeout(loopT); home.classList.remove('on'); showForm(); });
 
   function showForm() {
     clearTimeout(resetTimer);
